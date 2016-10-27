@@ -2,6 +2,9 @@ import os
 
 from flyingpigeon.subset import clipping
 from pywps.Process import WPSProcess
+from owslib.wfs import WebFeatureService
+from owslib.fes import *
+from owslib.etree import etree
 
 import logging
 logger = logging.getLogger(__name__)
@@ -106,6 +109,18 @@ class WFSClippingProcess(WPSProcess):
             #    variable = variable,
             #    dir_output = os.path.abspath(os.curdir),
             #    )
+
+            #Get the data
+            wfs = WebFeatureService("http://132.217.140.48:8080/geoserver/wfs", "1.1.0")
+            filterprop = PropertyIsLike(propertyname='STATE_NAME', literal='TEXAS', wildCard='*')
+            filterxml = etree.tostring(filterprop.toXML()).decode("utf-8")
+            polygons = wfs.getfeature(typename='usa:states', filter=filterxml, outputFormat='shape-zip')
+
+            #Saves the result
+            out = open('/mnt/shared/data.zip', 'wb')
+            out.write(bytes(polygons.read()))
+            out.close()
+
             results = True
             logger.info('Done')
         except Exception as e:
