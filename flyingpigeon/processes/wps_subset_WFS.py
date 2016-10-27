@@ -6,7 +6,10 @@ from owslib.wfs import WebFeatureService
 from owslib.fes import *
 from owslib.etree import etree
 
+import uuid
+import zipfile
 import logging
+import shutil
 logger = logging.getLogger(__name__)
 
 
@@ -32,21 +35,30 @@ class WFSClippingProcess(WPSProcess):
             formats=[{"mimeType":"application/x-netcdf"}],
             )
        
-        self.typenames = self.addLiteralInput(
-            identifier="typenames",
-            title="TypeNames",
-            abstract="Target layer",
+        self.typename = self.addLiteralInput(
+            identifier="typename",
+            title="TypeName",
+            abstract="Layer to fetch from WFS server",
             type=type(''),
             minOccurs=1,
             maxOccurs=1
             )
-        
-        self.cql = self.addLiteralInput(
-            identifier="cql",
-            title="CQL filters",
-            abstract="The command that selects only a subset of the polygons in the target layer",
+
+        self.featureids = self.addLiteralInput(
+            identifier="featureids",
+            title="Feature Ids",
+            abstract="List of unique feature ids",
             type=type(''),
-            minOccurs=1,
+            minOccurs=0,
+            maxOccurs=1
+        )
+        
+        self.xmlfilter = self.addLiteralInput(
+            identifier="filter",
+            title="XML filter",
+            abstract="XML-encoded OGC filter expression",
+            type=type(''),
+            minOccurs=0,
             maxOccurs=1
             )
 
@@ -89,19 +101,56 @@ class WFSClippingProcess(WPSProcess):
     def execute(self):
         urls = self.getInputValues(identifier='resource')
         mosaic = self.mosaic.getValue()
-        cql = self.cql.getValue()
-        typenames = self.typenames.getValue()
+        featureids = self.featureids.getValue()
+        xmlfilter = self.xmlfilter.getValue()
+        typename = self.typename.getValue()
 
         logger.info('urls = %s', urls)
-        logger.info('cql = %s', cql)
+        logger.info('filter = %s', xmlfilter)
         logger.info('mosaic = %s', mosaic)
-        logger.info('typenames = %s', typenames)
+        logger.info('typename = %s', typename)
+        logger.info('featureids = %s', featureids)
     
         self.status.set('Arguments set for WPS subset process', 0)
         logger.debug('starting: num_files=%s' % (len(urls)))
 
         try:
-            #results = clipping(
+
+            #Validate typename first?
+
+            #Connect to WFS server
+            wfs = WebFeatureService("http://132.217.140.48:8080/geoserver/wfs", "1.1.0")
+
+            # What type of request will we do
+            if featureids is None:
+                if xmlfilter is None:
+                    filterprop = PropertyIsLike(propertyname='STATE_NAME', literal='TEXAS', wildCard='*')
+                    xmlfilter_fromprops = etree.tostring(filterprop.toXML()).decode("utf-8")
+                    polygons = wfs.getfeature(typename=typename, filter=xmlfilter_fromprops, outputFormat='shape-zip')
+                else:
+                    raise Exception('Feature Ids or XML filter required')
+            else:
+                featurelist = featureids.split(",")
+                polygons = wfs.getfeature(typename=typename, featureid=featurelist, outputFormat='shape-zip')
+
+            #get unique name for folder and create it
+            unique_dirname = str(uuid.uuid4())
+            dirpath = os.path.join('/mnt/shared/', unique_dirname)
+            os.mkdir(dirpath)
+            filepath = os.path.join(dirpath, 'file.zip')
+
+            #Saves the result in folder and unzips it
+            out = open(filepath, 'wb')
+            out.write(bytes(polygons.read()))
+            out.close()
+            zip_ref = zipfile.ZipFile(filepath, 'r')
+            zip_ref.extractall(dirpath)
+            zip_ref.close()
+
+            #Swith GeoCabinet
+
+            #Do clipping
+            # results = clipping(
             #    resource = urls,
             #    polygons = regions, # self.region.getValue(),
             #    mosaic = mosaic,
@@ -110,16 +159,8 @@ class WFSClippingProcess(WPSProcess):
             #    dir_output = os.path.abspath(os.curdir),
             #    )
 
-            #Get the data
-            wfs = WebFeatureService("http://132.217.140.48:8080/geoserver/wfs", "1.1.0")
-            filterprop = PropertyIsLike(propertyname='STATE_NAME', literal='TEXAS', wildCard='*')
-            filterxml = etree.tostring(filterprop.toXML()).decode("utf-8")
-            polygons = wfs.getfeature(typename='usa:states', filter=filterxml, outputFormat='shape-zip')
-
-            #Saves the result
-            out = open('/mnt/shared/data.zip', 'wb')
-            out.write(bytes(polygons.read()))
-            out.close()
+            #Remove folder
+            shutil.rmtree(dirpath)
 
             results = True
             logger.info('Done')
