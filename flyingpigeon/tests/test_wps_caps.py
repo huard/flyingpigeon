@@ -22,6 +22,7 @@ def test_caps():
         'sdm_gbifsearch',
         'segetalflora',
         'spatial_analog',
+        'subset_WFS',
         'subset_continents',
         'subset_countries',
         'subset_points',
