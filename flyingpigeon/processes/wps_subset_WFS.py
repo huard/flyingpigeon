@@ -116,6 +116,7 @@ class WFSClippingProcess(WPSProcess):
         try:
 
             #Connect to WFS server
+            shapefile_name = typename.split(":")[1]
             wfs = WebFeatureService("http://132.217.140.48:8080/geoserver/wfs", "1.1.0")
 
             # What type of request will we do
@@ -145,7 +146,7 @@ class WFSClippingProcess(WPSProcess):
             zip_ref.close()
 
             #Has to switch LAT/LON to LON/LAT, because OWlib can't do 1.0.0 and don't accept EPSG:xxxx as srs
-            source_shp_path = os.path.join(dirpath, 'states.shp')
+            source_shp_path = os.path.join(dirpath, shapefile_name + ".shp")
             args = ("ogr2ogr", "-s_srs", "\"+proj=latlong +datum=WGS84 +axis=neu +wktext\"",
                     "-t_srs", "\"+proj=latlong +datum=WGS84 +axis=enu +wktext\"",  source_shp_path, source_shp_path)
             popen = subprocess.Popen(args, stdout=subprocess.PIPE)
@@ -160,7 +161,7 @@ class WFSClippingProcess(WPSProcess):
                 variable=variable,
                 dir_output=os.path.abspath(os.curdir),
                 geomcabinet=dirpath,
-                geom='states'
+                geom=shapefile_name
                 )
 
             #Remove folder
