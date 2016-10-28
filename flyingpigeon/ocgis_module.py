@@ -21,7 +21,7 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
   regrid_destination=None, regrid_options='bil', level_range=None,
   geom=None, output_format_options=False, search_radius_mult=2., 
   select_nearest=False, select_ugid=None, spatial_wrapping=None, t_calendar=None, time_region=None, time_range=None,
-  dir_output=curdir, output_format='nc'):
+  dir_output=curdir, output_format='nc', geomcabinet=DIR_SHP):
   '''
   ocgis operation call
 
@@ -37,6 +37,7 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
   :param regrid_destination: file path with netCDF file with grid for output file
 
   :param geom: name of shapefile stored in birdhouse shape cabinet
+  :param geomcabinet: directory that holds the shapefiles
   :param output_format_options: output options for netCDF e.g compression level()
   :param regrid_destination: file containing the targed grid (griddes.txt or netCDF file)
   :param regrid_options: methods for regridding: 
@@ -57,12 +58,20 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
   :return: output file path
   '''
   logger.info('Start ocgis module call function')
-  from ocgis import OcgOperations, RequestDataset , env
+  from ocgis import OcgOperations, RequestDataset, env, constants
   from ocgis.util.large_array import compute
   import uuid
-  
-  # prepare the environment 
-  env.DIR_SHPCABINET = DIR_SHP
+
+  if geomcabinet is None:
+    geomcabinet = DIR_SHP
+
+  env.DIR_SHPCABINET = geomcabinet
+
+  if  env.DIR_SHPCABINET == DIR_SHP:
+    env.DEFAULT_GEOM_UID = constants.OCGIS_UNIQUE_GEOMETRY_IDENTIFIER
+  else:
+    env.DEFAULT_GEOM_UID = 'FID'
+
   env.OVERWRITE = True
   env.DIR_OUTPUT = dir_output
   
@@ -72,8 +81,7 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
   else: 
     spatial_reorder = False
     spatial_wrapping = None
-  
-  
+
   if prefix == None:
     prefix = str(uuid.uuid1()) 
   env.PREFIX = prefix
@@ -87,6 +95,7 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
   
   if type(resource) != list: 
     resource = list([resource])
+
   # execute ocgis 
   logger.info('Execute ocgis module call function')
   
@@ -152,37 +161,7 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
       logger.info('data_mb  = %s ; memory_limit = %s ' % (data_mb , mem_limit ))
     except Exception as e: 
       logger.debug('failed to compare dataload with free memory %s ' % e)
-      raise  
-
-
-    ## check memory load
-    #from os import stat
-    
-      #if memory_limit == None: 
-        #f = FreeMemory()
-        #mem_kb = f.user_free 
-        #mem_mb = mem_kb / 1024.
-        #mem_limit = mem_mb / 2. # set limit to half of the free memory
-      #else:
-        #mem_limit = memory_limit
-
-      #if mem_limit >= 1024. * 4: 
-        #mem_limit = 1024. * 4
-        ## 475.0 MB for openDAP 
-      
-      ##if type(resource) == list : 
-        ##data_kb =  stat(resource[0]).st_size * len(resource)
-      ##else: 
-        ##data_kb =  stat(resource).st_size
-      #size = ops.get_base_request_size()['total']
-      #data_kb = size['total']/reduce(lambda x,y: x*y,size['variables'][variable]['value']['shape'])
-      #data_mb = data_kb / 1024.
-
-      #if variable == None: 
-        #variable = rd.variable
-        #logger.info('%s as variable dedected' % (variable))
-      
-      #logger.info('data_mb  = %s ; memory_limit = %s ' % (data_mb  , mem_limit ))
+      raise
     
     if data_mb <= mem_limit :  # input is smaler than the half of free memory size
       try:
@@ -248,9 +227,18 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
         raise 
     else:
       output = geom_file
+
+    #resets UID
+    env.DEFAULT_GEOM_UID = constants.DEFAULT_GEOMETRY_KEY
   return output
 
-  
+def set_custom_shapefile_info(shpcabinet, unique_id):
+  from ocgis import env
+
+  env.DIR_SHPCABINET = shpcabinet
+  env.DEFAULT_GEOM_UID = unique_id
+
+
 def eval_timerange(resource, time_range):
   """
   quality checker if given time_range is covered by timesteps in resource files

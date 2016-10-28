@@ -104,6 +104,7 @@ class WFSClippingProcess(WPSProcess):
         featureids = self.featureids.getValue()
         xmlfilter = self.xmlfilter.getValue()
         typename = self.typename.getValue()
+        variable = self.variable.getValue()
 
         logger.info('urls = %s', urls)
         logger.info('filter = %s', xmlfilter)
@@ -116,22 +117,24 @@ class WFSClippingProcess(WPSProcess):
 
         try:
 
-            #Validate typename first?
+            #Validate inputs!
 
             #Connect to WFS server
             wfs = WebFeatureService("http://132.217.140.48:8080/geoserver/wfs", "1.1.0")
 
             # What type of request will we do
             if featureids is None:
-                if xmlfilter is None:
-                    filterprop = PropertyIsLike(propertyname='STATE_NAME', literal='TEXAS', wildCard='*')
-                    xmlfilter_fromprops = etree.tostring(filterprop.toXML()).decode("utf-8")
-                    polygons = wfs.getfeature(typename=typename, filter=xmlfilter_fromprops, outputFormat='shape-zip')
+                if xmlfilter is not None:
+                    polygons = wfs.getfeature(typename=typename, filter=xmlfilter, outputFormat='shape-zip')
                 else:
                     raise Exception('Feature Ids or XML filter required')
             else:
-                featurelist = featureids.split(",")
+                featurelist= featureids.split(",")
                 polygons = wfs.getfeature(typename=typename, featureid=featurelist, outputFormat='shape-zip')
+                featureidlist = []
+                for feat in featurelist:
+                    parts = feat.split(".")
+                    featureidlist.append(parts[1])
 
             #get unique name for folder and create it
             unique_dirname = str(uuid.uuid4())
@@ -147,17 +150,17 @@ class WFSClippingProcess(WPSProcess):
             zip_ref.extractall(dirpath)
             zip_ref.close()
 
-            #Swith GeoCabinet
-
-            #Do clipping
-            # results = clipping(
-            #    resource = urls,
-            #    polygons = regions, # self.region.getValue(),
-            #    mosaic = mosaic,
-            #    spatial_wrapping='wrap',
-            #    variable = variable,
-            #    dir_output = os.path.abspath(os.curdir),
-            #    )
+            #Do clipping, without forgetting to switch GEOMCABINET
+            results = clipping(
+                resource=urls,
+                polygons=featureidlist, # self.region.getValue(),
+                mosaic=mosaic,
+                spatial_wrapping='wrap',
+                variable=variable,
+                dir_output=os.path.abspath(os.curdir),
+                geomcabinet=dirpath,
+                geom='states'
+                )
 
             #Remove folder
             shutil.rmtree(dirpath)
