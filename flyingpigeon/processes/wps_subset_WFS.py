@@ -1,17 +1,15 @@
 import os
-
-from flyingpigeon.subset import clipping
-from pywps.Process import WPSProcess
-from owslib.wfs import WebFeatureService
-from owslib.fes import *
-from owslib.etree import etree
-
 import uuid
 import zipfile
 import logging
 import shutil
-logger = logging.getLogger(__name__)
+import subprocess
 
+from flyingpigeon.subset import clipping
+from pywps.Process import WPSProcess
+from owslib.wfs import WebFeatureService
+
+logger = logging.getLogger(__name__)
 
 class WFSClippingProcess(WPSProcess):
     def __init__(self):
@@ -117,8 +115,6 @@ class WFSClippingProcess(WPSProcess):
 
         try:
 
-            #Validate inputs!
-
             #Connect to WFS server
             wfs = WebFeatureService("http://132.217.140.48:8080/geoserver/wfs", "1.1.0")
 
@@ -148,10 +144,17 @@ class WFSClippingProcess(WPSProcess):
             zip_ref.extractall(dirpath)
             zip_ref.close()
 
+            #Has to switch LAT/LON to LON/LAT, because OWlib can't do 1.0.0 and don't accept EPSG:xxxx as srs
+            source_shp_path = os.path.join(dirpath, 'states.shp')
+            args = ("ogr2ogr", "-s_srs", "\"+proj=latlong +datum=WGS84 +axis=neu +wktext\"",
+                    "-t_srs", "\"+proj=latlong +datum=WGS84 +axis=enu +wktext\"",  source_shp_path, source_shp_path)
+            popen = subprocess.Popen(args, stdout=subprocess.PIPE)
+            popen.wait()
+
             #Do clipping, without forgetting to switch GEOMCABINET
             results = clipping(
                 resource=urls,
-                polygons=featureidlist, # self.region.getValue(),
+                polygons=featureidlist,
                 mosaic=mosaic,
                 spatial_wrapping='wrap',
                 variable=variable,
