@@ -131,10 +131,8 @@ class WFSClippingProcess(WPSProcess):
             else:
                 featurelist= featureids.split(",")
                 polygons = wfs.getfeature(typename=typename, featureid=featurelist, outputFormat='shape-zip')
-                featureidlist = []
-                for feat in featurelist:
-                    parts = feat.split(".")
-                    featureidlist.append(parts[1])
+                rangedlist = range(1, len(featurelist)+1)
+                featureidlist = [str(elem) for elem in rangedlist]
 
             #get unique name for folder and create it
             unique_dirname = str(uuid.uuid4())
