@@ -81,21 +81,21 @@ class WFSClippingProcess(WPSProcess):
             maxOccurs=1,
         )
 
-        # self.output = self.addComplexOutput(
-        #     title="Subsets",
-        #     abstract="Tar archive containing the netCDF files",
-        #     formats=[{"mimeType":"application/x-tar"}],
-        #     asReference=True,
-        #     identifier="output",
-        #     )
-        #
-        # self.output_netcdf = self.addComplexOutput(
-        #     title="Subsets for one dataset",
-        #     abstract="NetCDF file with subsets of one dataset.",
-        #     formats=[{"mimeType":"application/x-netcdf"}],
-        #     asReference=True,
-        #     identifier="ncout",
-        #     )
+        self.output = self.addComplexOutput(
+            title="Subsets",
+            abstract="Tar archive containing the netCDF files",
+            formats=[{"mimeType":"application/x-tar"}],
+            asReference=True,
+            identifier="output",
+        )
+
+        self.output_netcdf = self.addComplexOutput(
+            title="Subsets for one dataset",
+            abstract="NetCDF file with subsets of one dataset.",
+            formats=[{"mimeType":"application/x-netcdf"}],
+            asReference=True,
+            identifier="ncout",
+        )
 
     def execute(self):
         urls = self.getInputValues(identifier='resource')
@@ -119,7 +119,7 @@ class WFSClippingProcess(WPSProcess):
             #Connect to WFS server
             shapefile_name = typename.split(":")[1]
             url = config.wfs_url()
-            wfs = WebFeatureService(url "1.1.0")
+            wfs = WebFeatureService(url, "1.1.0")
 
             # What type of request will we do
             if featureids is None:
@@ -165,12 +165,8 @@ class WFSClippingProcess(WPSProcess):
                 geomcabinet=dirpath,
                 geom=shapefile_name
                 )
-
-            #Remove folder
             shutil.rmtree(dirpath)
-
-            results = True
-            logger.info('Done')
+            logger.info('WPS clipping done')
         except Exception as e:
             msg = 'WPS clipping failed'
             logger.exception(msg)
@@ -179,6 +175,25 @@ class WFSClippingProcess(WPSProcess):
         if not results:
             raise Exception('no results produced.')
 
-        #self.output.setValue("")
-        #self.output_netcdf.setValue("")
+        # prepare tar file
+        try:
+            from flyingpigeon.utils import archive
+            tarf = archive(results)
+            logger.info('Tar file prepared')
+        except Exception as e:
+            msg = 'Tar file preparation failed'
+            logger.exception(msg)
+            raise Exception(msg)
+
+        self.output.setValue(tarf)
+
+        i = next((i for i, x in enumerate(results) if x), None)
+        self.output_netcdf.setValue(results[i])
+
         self.status.set('done', 100)
+
+
+
+
+
+
