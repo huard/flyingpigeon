@@ -130,7 +130,7 @@ class WFSClippingProcess(WPSProcess):
             else:
                 featurelist= featureids.split(",")
                 polygons = wfs.getfeature(typename=typename, featureid=featurelist, outputFormat='shape-zip')
-                rangedlist = range(1, len(featurelist)+1)
+                rangedlist = range(0, len(featurelist))
                 featureidlist = [str(elem) for elem in rangedlist]
 
             #get unique name for folder and create it
@@ -165,7 +165,7 @@ class WFSClippingProcess(WPSProcess):
                 geomcabinet=dirpath,
                 geom=shapefile_name
                 )
-            shutil.rmtree(dirpath)
+            #shutil.rmtree(dirpath)
             logger.info('WPS clipping done')
         except Exception as e:
             msg = 'WPS clipping failed'
