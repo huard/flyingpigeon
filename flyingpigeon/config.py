@@ -13,7 +13,6 @@ def Rsrc_dir():
 def JSsrc_dir():
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'JSsrc')
 
-
 def masks_dir():
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'masks')
 
@@ -49,6 +48,13 @@ def www_url():
         url = None
         logger.warn('no www-url configured')
     return url
-           
+
+def wfs_url():
+    try:
+        url = wpsconfig.getConfigValue("flyingpigeon", "wfs_url")
+    except:
+        url = None
+        logger.warn('no wfs-url configured')
+    return url
     
 

@@ -56,12 +56,12 @@ def masking(resource, mask, prefix=None, dir_output=None):
   return resource_masked
 
 def clipping(resource=[], variable=None, dimension_map=None, calc=None,  output_format='nc',
-  calc_grouping= None, time_range=None, time_region=None,  historical_concatination=True, prefix=None, spatial_wrapping='wrap', polygons=None, mosaic=False, dir_output=None, memory_limit=None):
+  calc_grouping= None, time_range=None, time_region=None,  historical_concatination=True, prefix=None, spatial_wrapping='wrap', polygons=None, mosaic=False, dir_output=None, memory_limit=None, geomcabinet=None, geom=None):
   """ returns list of clipped netCDF files
   
   :param resource: list of input netCDF files
   :param variable: variable (string) to be used in netCDF
-  :param dimesion_map: specify a dimension map if input netCDF has unconventional dimension
+  :param dimension_map: specify a dimension map if input netCDF has unconventional dimension
   :param calc: ocgis calculation argument
   :param calc_grouping: ocgis calculation grouping 
   :param historical_concatination: concat files of RCPs with appropriate historical runs into one timeseries 
@@ -69,6 +69,7 @@ def clipping(resource=[], variable=None, dimension_map=None, calc=None,  output_
   :param polygons: list of polygons to be used. If more than 1 in the list, an appropriate mosaic will be clipped
   :param output_format: output_format (default='nc')
   :param dir_output: specify an output location
+  :param geomcabinet: directory that holds the shapefiles
   :param time_range: [start, end] of time subset
   :param time_region: year, months or days to be extracted in the timeseries
 
@@ -85,7 +86,7 @@ def clipping(resource=[], variable=None, dimension_map=None, calc=None,  output_
   if prefix != None:
     if type(prefix) != list:
       prefix = list([prefix])
-  
+
   geoms = set()
   ncs = sort_by_filename(resource, historical_concatination=historical_concatination) #  historical_concatenation=True
   geom_files = []
@@ -114,7 +115,7 @@ def clipping(resource=[], variable=None, dimension_map=None, calc=None,  output_
         geom_file = call(resource=ncs[key], variable=variable, calc=calc, calc_grouping=calc_grouping, output_format=output_format,
                          prefix=name, geom=geom, select_ugid=ugids, time_range=time_range, time_region=time_region, 
                          spatial_wrapping=spatial_wrapping, memory_limit=memory_limit,
-                         dir_output=dir_output, dimension_map=dimension_map)
+                         dir_output=dir_output, dimension_map=dimension_map, geomcabinet=geomcabinet)
         geom_files.append( geom_file )  
       except Exception as e:
         msg = 'ocgis calculations failed for %s ' % (key)
@@ -122,8 +123,12 @@ def clipping(resource=[], variable=None, dimension_map=None, calc=None,  output_
   else: 
     for i, polygon in enumerate(polygons): 
       try:
-        geom = get_geom(polygon)
-        ugid = get_ugid(polygons=polygon, geom=geom)
+        if geom is None:
+          geom = get_geom(polygon)
+          ugid = get_ugid(polygons=polygon, geom=geom)
+        else:
+          ugid = polygons
+
         for key in  ncs.keys():
           try:
             if variable == None:
@@ -134,8 +139,9 @@ def clipping(resource=[], variable=None, dimension_map=None, calc=None,  output_
             else:
               name = prefix[i]
             geom_file = call(resource=ncs[key], variable=variable,  calc=calc, calc_grouping=calc_grouping,output_format=output_format,
-              prefix=name, geom=geom, select_ugid=ugid, dir_output=dir_output, dimension_map=dimension_map, spatial_wrapping=spatial_wrapping, memory_limit=memory_limit,time_range=time_range, time_region=time_region,
-              )
+                             prefix=name, geom=geom, select_ugid=ugid, dir_output=dir_output, dimension_map=dimension_map,
+                             spatial_wrapping=spatial_wrapping, memory_limit=memory_limit,time_range=time_range, time_region=time_region,
+                             geomcabinet=geomcabinet)
             geom_files.append( geom_file )
           except Exception as e:
             msg = 'ocgis calculations failed for %s ' % (key)
