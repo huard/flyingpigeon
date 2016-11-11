@@ -117,7 +117,7 @@ class WFSClippingProcess(WPSProcess):
         try:
 
             #Connect to WFS server
-            shapefile_name = typename.split(":")[1]
+            source_shapefile_name = typename.split(":")[1]
             url = config.wfs_url()
             wfs = WebFeatureService(url, "1.1.0")
 
@@ -135,7 +135,7 @@ class WFSClippingProcess(WPSProcess):
 
             #get unique name for folder and create it
             unique_dirname = str(uuid.uuid4())
-            dirpath = os.path.join('/mnt/shared/', unique_dirname)
+            dirpath = os.path.join(config.cache_path(), unique_dirname)
             os.mkdir(dirpath)
             filepath = os.path.join(dirpath, 'file.zip')
 
@@ -148,9 +148,11 @@ class WFSClippingProcess(WPSProcess):
             zip_ref.close()
 
             #Has to switch LAT/LON to LON/LAT, because OWlib can't do 1.0.0 and don't accept EPSG:xxxx as srs
-            source_shp_path = os.path.join(dirpath, shapefile_name + ".shp")
+            source_shp_path = os.path.join(dirpath, source_shapefile_name + ".shp")
+            dest_shapefile_name =source_shapefile_name + "_flipped"
+            dest_shp_path = os.path.join(dirpath, dest_shapefile_name + ".shp")
             args = ("ogr2ogr", "-s_srs", "\"+proj=latlong +datum=WGS84 +axis=neu +wktext\"",
-                    "-t_srs", "\"+proj=latlong +datum=WGS84 +axis=enu +wktext\"",  source_shp_path, source_shp_path)
+                    "-t_srs", "\"+proj=latlong +datum=WGS84 +axis=enu +wktext\"",  dest_shp_path, source_shp_path)
             popen = subprocess.Popen(args, stdout=subprocess.PIPE)
             popen.wait()
 
@@ -163,7 +165,7 @@ class WFSClippingProcess(WPSProcess):
                 variable=variable,
                 dir_output=os.path.abspath(os.curdir),
                 geomcabinet=dirpath,
-                geom=shapefile_name
+                geom=dest_shapefile_name
                 )
             #shutil.rmtree(dirpath)
             logger.info('WPS clipping done')
