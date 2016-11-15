@@ -176,8 +176,26 @@ class WFSClippingProcess(WPSProcess):
             logger.exception(msg)
             raise Exception(msg)
 
+        # This gives the masked array
+        # timeseries[0][1].items()[0][1].variables.items()[0][1].value
+
+        #for each element in resulting list timeseries(each input dataset)
+        #timeseries[0]
+
+        #for each element in spatial collection (each subsetted field)
+        #timeseries[0][1]
+
+        #for each element in OrderedDict (each variable)
+        #timeseries[0][1].items()[0][1]
+
         if not timeseries:
             raise Exception('no results produced.')
+        else:
+            import codecs, json
+            result_list = timeseries[0][1].items()[0][1].variables.items()[0][1].value.tolist()
+            file_path = os.path.join(config.output_path(), 'output.json')
+            json.dump(result_list, codecs.open(file_path, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=True,
+                      indent=4)
 
         self.status.set('done', 100)
 
