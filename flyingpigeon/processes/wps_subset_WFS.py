@@ -167,7 +167,6 @@ class WFSClippingProcess(WPSProcess):
                 geomcabinet=dirpath,
                 geom=dest_shapefile_name
                 )
-            #shutil.rmtree(dirpath)
             logger.info('WPS clipping done')
         except Exception as e:
             msg = 'WPS clipping failed'
