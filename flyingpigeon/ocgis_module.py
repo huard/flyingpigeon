@@ -21,21 +21,20 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
   regrid_destination=None, regrid_options='bil', level_range=None,
   geom=None, output_format_options=False, search_radius_mult=2., 
   select_nearest=False, select_ugid=None, spatial_wrapping=None, t_calendar=None, time_region=None, time_range=None,
-  dir_output=curdir, output_format='nc', geomcabinet=DIR_SHP):
+  dir_output=curdir, output_format='nc', geomcabinet=DIR_SHP, spatial_operation='intersects', aggregate=False):
   '''
   ocgis operation call
 
-  :param resource:
+  :param resource: the input NetCDF files
   :param variable: variable in the input file to be picked
   :param dimension_map: dimension map in case of unconventional storage of data 
   :param calc: ocgis calc syntax for calculation partion 
   :param calc_grouping: time aggregate grouping 
-  :param conform_units_to: 
+  :param conform_units_to: TODO
   :param memory_limit: limit the amount of data to be loaded into the memory at once if None (default) free memory is detected by birdhouse
   :param level_range: subset of given levels
   :param prefix: string for the file base name 
   :param regrid_destination: file path with netCDF file with grid for output file
-
   :param geom: name of shapefile stored in birdhouse shape cabinet
   :param geomcabinet: directory that holds the shapefiles
   :param output_format_options: output options for netCDF e.g compression level()
@@ -47,14 +46,21 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
                           'nn' = nearest neighbour
                           'con' = First-order conservative remapping
                           'laf' = largest area fraction reamapping
+  :param spatial_operation: methods for subsetting:
+                          'intersects' = selects boundaries if overlaps subset polygon
+                          'clip' = cut boundaries with subset polygon
+  :param aggregate: request a spatial aggregation. Output format must be 'numpy'
   :param search_radius_mult: search radius for point geometries. All included gridboxes will be returned
   :param select_nearest: nearest neighbour selection for point geometries
   :param select_ugid: ugid for appropriate polygons 
   :param spatial_wrapping: how to handle coordinates in case of subsets, options: None (default), 'wrap', 'unwrap'
   :param time_region: select single month 
   :param time_range: sequence of two datetime.datetime objects to mark start and end point 
-  :param dir_output (default= curdir):
-  :param output_format:
+  :param dir_output (default= curdir): the directory that will hold the output
+  :param output_format: the format of computed output:
+                          'nc' = NetCDF output
+                          'numpy' = Numpy array
+
   :return: output file path
   '''
   logger.info('Start ocgis module call function')
@@ -74,17 +80,15 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
 
   env.OVERWRITE = True
   env.DIR_OUTPUT = dir_output
-  
-  if geom != None:
-    spatial_reorder = True
-    spatial_wrapping = 'wrap'
-  else: 
-    spatial_reorder = False
-    spatial_wrapping = None
+
+  #Removing previous condition that sets spatial_reorder to True if geom not null
+  spatial_reorder = False
+  spatial_wrapping = None
 
   if prefix == None:
     prefix = str(uuid.uuid1()) 
   env.PREFIX = prefix
+
   if output_format_options == False: 
     output_format_options = None
   elif output_format_options == True:
@@ -98,28 +102,19 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
 
   # execute ocgis 
   logger.info('Execute ocgis module call function')
-  
-  #if time_range != None:
-    #time_range = eval_timerange(resource, time_range)
 
   if has_Lambert_Conformal(resource) == True and not geom == None:
     logger.debug('input has Lambert_Conformal projection and can not subsetted with geom')
     output = None
   else:
     try:
-      #if regrid_destination != None: 
-        #rd_regrid = RequestDataset(uri=regrid_destination)
-      #else:
-        #rd_regrid = None
       rd = RequestDataset(resource, variable=variable, level_range=level_range,
         dimension_map=dimension_map, conform_units_to=conform_units_to, 
-        time_region=time_region,t_calendar=t_calendar, time_range=time_range)
+        time_region=time_region, t_calendar=t_calendar, time_range=time_range)
       ops = OcgOperations(dataset=rd,
-        output_format_options=output_format_options,
         spatial_wrapping=spatial_wrapping,
         spatial_reorder=spatial_reorder,
-        # regrid_destination=rd_regrid,
-        # options=options,
+        spatial_operation=spatial_operation,
         calc=calc,
         calc_grouping=calc_grouping,
         geom=geom,
@@ -128,7 +123,8 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
         search_radius_mult=search_radius_mult,
         select_nearest=select_nearest,
         select_ugid=select_ugid, 
-        add_auxiliary_files=False)
+        add_auxiliary_files=False,
+        aggregate=aggregate)
       logger.info('OcgOperations set')
       
     except Exception as e: 
@@ -157,7 +153,6 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
         variable = rd.variable
         logger.info('%s as variable dedected' % (variable))
 
-      #data_kb = size['total']/reduce(lambda x,y: x*y,size['variables'][variable]['value']['shape'])
       logger.info('data_mb  = %s ; memory_limit = %s ' % (data_mb , mem_limit ))
     except Exception as e: 
       logger.debug('failed to compare dataload with free memory %s ' % e)
@@ -188,21 +183,20 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
           calc = '%s=%s*1' % (variable, variable)
           logger.info('calc set to = %s ' %  calc)
           ops = OcgOperations(dataset=rd,
-                    output_format_options=output_format_options,
-                    spatial_wrapping=spatial_wrapping,
-                    spatial_reorder=spatial_reorder,
-                    # regrid_destination=rd_regrid,
-                    # options=options,
-                    calc=calc,
-                    calc_grouping=calc_grouping,
-                    geom=geom,
-                    output_format=output_format,
-                    prefix=prefix,
-                    search_radius_mult=search_radius_mult,
-                    select_nearest=select_nearest,
-                    select_ugid=select_ugid, 
-                    add_auxiliary_files=False)          
-        geom_file = compute(ops, tile_dimension=int(tile_dim) , verbose=True)
+            spatial_wrapping=spatial_wrapping,
+            spatial_reorder=spatial_reorder,
+            spatial_operation=spatial_operation,
+            calc=calc,
+            calc_grouping=calc_grouping,
+            geom=geom,
+            output_format=output_format,
+            prefix=prefix,
+            search_radius_mult=search_radius_mult,
+            select_nearest=select_nearest,
+            select_ugid=select_ugid,
+            add_auxiliary_files=False,
+            aggregate=aggregate)
+        geom_file = compute(ops, tile_dimension=int(tile_dim), verbose=True)
       except Exception as e: 
         logger.debug('failed to compute ocgis with chunks')
         raise
