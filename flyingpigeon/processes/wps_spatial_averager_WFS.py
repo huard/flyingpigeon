@@ -2,8 +2,8 @@ import os
 import uuid
 import zipfile
 import logging
-import shutil
 import subprocess
+import json
 
 from flyingpigeon.subset import clipping
 from flyingpigeon import config
@@ -19,7 +19,7 @@ class WFSClippingProcess(WPSProcess):
             identifier="spatial_averager_WFS",
             title="Spatial averager WFS",
             version="0.1",
-            abstract="Fetch a shapefile from a WFS server and return averaged timeseries for all the polygons it contains",
+            abstract="Fetch a shapefile from a WFS server and return averaged timeseries in JSON for all the polygons it contains",
             statusSupported=True,
             storeSupported=True
             )
@@ -191,11 +191,13 @@ class WFSClippingProcess(WPSProcess):
         if not timeseries:
             raise Exception('no results produced.')
         else:
-            import codecs, json
-            result_list = timeseries[0][1].items()[0][1].variables.items()[0][1].value.tolist()
+            result_nested_list = timeseries[0][1].items()[0][1].variables.items()[0][1].value.tolist()
+            flatten=lambda l: sum(map(flatten,l),[]) if isinstance(l,list) else [l]
+            result_list = flatten(result_nested_list)
             file_path = os.path.join(config.output_path(), 'output.json')
-            json.dump(result_list, codecs.open(file_path, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=True,
-                      indent=4)
+            with open(file_path, 'w') as fp:
+                json.dump(result_list, fp)
+            fp.close()
 
         self.status.set('done', 100)
 
