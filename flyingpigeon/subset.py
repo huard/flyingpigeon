@@ -135,7 +135,7 @@ def clipping(resource=[], variable=None, dimension_map=None, calc=None,  output_
           geom = get_geom(polygon)
           ugid = get_ugid(polygons=polygon, geom=geom)
         else:
-          ugid = polygons
+          ugid = polygon
 
         for key in  ncs.keys():
           try:
