@@ -71,24 +71,6 @@ class WFSClippingProcess(WPSProcess):
             maxOccurs=1,
             )
 
-        self.mosaic = self.addLiteralInput(
-            identifier="mosaic",
-            title="Mosaic",
-            abstract="If Mosaic is checked, selected polygons will be merged to one Mosaic for each input file",
-            default=False,
-            type=type(False),
-            minOccurs=0,
-            maxOccurs=1,
-        )
-
-        self.output = self.addComplexOutput(
-            title="Subsets",
-            abstract="Tar archive containing the netCDF files",
-            formats=[{"mimeType":"application/x-tar"}],
-            asReference=True,
-            identifier="output",
-        )
-
         self.tarout = self.addComplexOutput(
             identifier="tarout",
             title="Tarfile",
@@ -99,7 +81,6 @@ class WFSClippingProcess(WPSProcess):
 
     def execute(self):
         urls = self.getInputValues(identifier='resource')
-        mosaic = self.mosaic.getValue()
         featureids = self.featureids.getValue()
         xmlfilter = self.xmlfilter.getValue()
         typename = self.typename.getValue()
@@ -107,7 +88,6 @@ class WFSClippingProcess(WPSProcess):
 
         logger.info('urls = %s', urls)
         logger.info('filter = %s', xmlfilter)
-        logger.info('mosaic = %s', mosaic)
         logger.info('typename = %s', typename)
         logger.info('featureids = %s', featureids)
     
@@ -160,10 +140,10 @@ class WFSClippingProcess(WPSProcess):
             timeseries = clipping(
                 resource=urls,
                 polygons=featureidlist,
-                mosaic=mosaic,
                 spatial_wrapping='wrap',
                 variable=variable,
                 dir_output=os.path.abspath(os.curdir),
+                historical_concatination=False,
                 geomcabinet=dirpath,
                 geom=dest_shapefile_name,
                 output_format='numpy',
