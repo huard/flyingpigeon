@@ -177,27 +177,19 @@ class WFSClippingProcess(WPSProcess):
             raise Exception(msg)
 
         # This gives the masked array
-        # timeseries[0][1].items()[0][1].variables.items()[0][1].value
-
-        #for each element in resulting list timeseries(each input dataset)
-        #timeseries[0]
-
-        #for each element in spatial collection (each subsetted field)
-        #timeseries[0][1]
-
-        #for each element in OrderedDict (each variable)
-        #timeseries[0][1].items()[0][1]
+        # timeseries[n][1].items()[0][1].variables.items()[m][1].value
 
         if not timeseries:
             raise Exception('no results produced.')
         else:
-            result_nested_list = timeseries[0][1].items()[0][1].variables.items()[0][1].value.tolist()
-            flatten=lambda l: sum(map(flatten,l),[]) if isinstance(l,list) else [l]
-            result_list = flatten(result_nested_list)
-            file_path = os.path.join(config.output_path(), 'output.json')
-            with open(file_path, 'w') as fp:
-                json.dump(result_list, fp)
-            fp.close()
+            for poly_idx in range(len(timeseries)):
+                result_nested_list = timeseries[poly_idx][1].items()[0][1].variables.items()[0][1].value.tolist()
+                flatten=lambda l: sum(map(flatten,l),[]) if isinstance(l,list) else [l]
+                result_list = flatten(result_nested_list)
+                file_path = os.path.join(config.output_path(), 'output{}.json'.format(poly_idx))
+                with open(file_path, 'w') as fp:
+                    json.dump(result_list, fp)
+                fp.close()
 
         self.status.set('done', 100)
 
