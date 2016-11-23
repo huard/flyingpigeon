@@ -2,8 +2,8 @@ import os
 import uuid
 import zipfile
 import logging
-import shutil
 import subprocess
+import json
 
 from flyingpigeon.subset import clipping
 from flyingpigeon import config
@@ -16,10 +16,10 @@ class WFSClippingProcess(WPSProcess):
     def __init__(self):
         WPSProcess.__init__(
             self, 
-            identifier="subset_WFS",
-            title="Subset WFS",
+            identifier="spatial_averager_WFS",
+            title="Spatial averager WFS",
             version="0.1",
-            abstract="Fetch a shapefile from a WFS server and clip each input dataset with all the polygons it contains",
+            abstract="Fetch a shapefile from a WFS server and return averaged timeseries in JSON for all the polygons it contains",
             statusSupported=True,
             storeSupported=True
             )
@@ -71,35 +71,16 @@ class WFSClippingProcess(WPSProcess):
             maxOccurs=1,
             )
 
-        self.mosaic = self.addLiteralInput(
-            identifier="mosaic",
-            title="Mosaic",
-            abstract="If Mosaic is checked, selected polygons will be merged to one Mosaic for each input file",
-            default=False,
-            type=type(False),
-            minOccurs=0,
-            maxOccurs=1,
-        )
-
-        self.output = self.addComplexOutput(
-            title="Subsets",
-            abstract="Tar archive containing the netCDF files",
-            formats=[{"mimeType":"application/x-tar"}],
+        self.tarout = self.addComplexOutput(
+            identifier="tarout",
+            title="Tarfile",
+            abstract="tar archive containing the value tables",
+            formats=[{"mimeType": "application/x-tar"}],
             asReference=True,
-            identifier="output",
-        )
-
-        self.output_netcdf = self.addComplexOutput(
-            title="Subsets for one dataset",
-            abstract="NetCDF file with subsets of one dataset.",
-            formats=[{"mimeType":"application/x-netcdf"}],
-            asReference=True,
-            identifier="ncout",
         )
 
     def execute(self):
         urls = self.getInputValues(identifier='resource')
-        mosaic = self.mosaic.getValue()
         featureids = self.featureids.getValue()
         xmlfilter = self.xmlfilter.getValue()
         typename = self.typename.getValue()
@@ -107,11 +88,10 @@ class WFSClippingProcess(WPSProcess):
 
         logger.info('urls = %s', urls)
         logger.info('filter = %s', xmlfilter)
-        logger.info('mosaic = %s', mosaic)
         logger.info('typename = %s', typename)
         logger.info('featureids = %s', featureids)
     
-        self.status.set('Arguments set for WPS subset process', 0)
+        self.status.set('Arguments set for WPS spatial averager process', 0)
         logger.debug('starting: num_files=%s' % (len(urls)))
 
         try:
@@ -157,39 +137,39 @@ class WFSClippingProcess(WPSProcess):
             popen.wait()
 
             #Do clipping, without forgetting to switch GEOMCABINET
-            results = clipping(
+            timeseries = clipping(
                 resource=urls,
                 polygons=featureidlist,
-                mosaic=mosaic,
                 spatial_wrapping='wrap',
                 variable=variable,
                 dir_output=os.path.abspath(os.curdir),
+                historical_concatination=False,
                 geomcabinet=dirpath,
-                geom=dest_shapefile_name
+                geom=dest_shapefile_name,
+                output_format='numpy',
+                spatial_operation='clip',
+                aggregate=True
                 )
-            logger.info('WPS clipping done')
+            logger.info('WPS spatial averager done')
         except Exception as e:
-            msg = 'WPS clipping failed'
+            msg = 'WPS spatial averaging failed'
             logger.exception(msg)
             raise Exception(msg)
 
-        if not results:
+        # This gives the masked array
+        # timeseries[n][1].items()[0][1].variables.items()[m][1].value
+
+        if not timeseries:
             raise Exception('no results produced.')
-
-        # prepare tar file
-        try:
-            from flyingpigeon.utils import archive
-            tarf = archive(results)
-            logger.info('Tar file prepared')
-        except Exception as e:
-            msg = 'Tar file preparation failed'
-            logger.exception(msg)
-            raise Exception(msg)
-
-        self.output.setValue(tarf)
-
-        i = next((i for i, x in enumerate(results) if x), None)
-        self.output_netcdf.setValue(results[i])
+        else:
+            for poly_idx in range(len(timeseries)):
+                result_nested_list = timeseries[poly_idx][1].items()[0][1].variables.items()[0][1].value.tolist()
+                flatten=lambda l: sum(map(flatten,l),[]) if isinstance(l,list) else [l]
+                result_list = flatten(result_nested_list)
+                file_path = os.path.join(config.output_path(), 'output{}.json'.format(poly_idx))
+                with open(file_path, 'w') as fp:
+                    json.dump(result_list, fp)
+                fp.close()
 
         self.status.set('done', 100)
 
