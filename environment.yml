@@ -55,6 +55,7 @@ dependencies:
 - python-cdo
 - ocgis-next=1.4.0.dev1=py27_3  #  nesii/channel/ocgis-next
 - proj.4=4.9.2
+- geos=3.4.2
 - jpeg=9b
 ################
 # analogue
