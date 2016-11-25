@@ -151,10 +151,12 @@ class WFSClippingProcess(WPSProcess):
             source_shp_path = os.path.join(dirpath, source_shapefile_name + ".shp")
             dest_shapefile_name =source_shapefile_name + "_flipped"
             dest_shp_path = os.path.join(dirpath, dest_shapefile_name + ".shp")
-            args = ("ogr2ogr", "-s_srs", "\"+proj=latlong +datum=WGS84 +axis=neu +wktext\"",
-                    "-t_srs", "\"+proj=latlong +datum=WGS84 +axis=enu +wktext\"",  dest_shp_path, source_shp_path)
-            popen = subprocess.Popen(args, stdout=subprocess.PIPE)
-            popen.wait()
+            args = ("ogr2ogr", "-s_srs", "+proj=latlong +datum=WGS84 +axis=neu +wktext",
+                    "-t_srs", "+proj=latlong +datum=WGS84 +axis=enu +wktext",  dest_shp_path, source_shp_path)
+            output, error = subprocess.Popen(args, stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE).communicate()
+            logger.info('ogr2ogr info:\n %s ' % output)
+            logger.debug('ogr2ogr errors:\n %s ' % error)
 
             #Do clipping, without forgetting to switch GEOMCABINET
             results = clipping(
