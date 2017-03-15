@@ -27,8 +27,8 @@ def get_configfile(files,
     :param seacyc: remove the smoothed seasonal cycle from the input fields (True/False)
     :param cycsmooth: smoothing window for the seasonal cycle in days (should be an odd integer)
     :param nanalog: Number of analogs to detect
-    :param distfun: Name of the distance function used to calculate the analogs. 
-     (Supported values: 'rms' 'mahalanobis', 'S1' (Teweles and wobus), 'cosine' (correlation) 
+    :param distfun: Name of the distance function used to calculate the analogs.
+     (Supported values: 'rms' 'mahalanobis', 'S1' (Teweles and wobus), 'cosine' (correlation)
      and - still experimental - 'of' (displacement and amplitude score based on optical flow image distortion)
     :param outformat: file format for output ('txt' or 'nc' (default))
     :param analysis_period: dates for which analogs are desired
@@ -186,16 +186,16 @@ def seacyc(archive, simulation, method='base'):
             # seasoncyc_sim  = call(resource=archive,
             # variable=variable,
             # prefix='seasoncyc_sim',
-            #calc=[{'func': 'mean', 'name': variable}],
+            # calc=[{'func': 'mean', 'name': variable}],
             # calc_grouping=['day','month'] )
             seasoncyc_sim = cdo.ydaymean(
                 input=simulation, output='seasoncyc_sim.nc')
         else:
             raise Exception('normalisation method not found')
 
-    except Exception as e:
-        msg = 'seacyc function failed : %s ' % e
-        logger.debug(msg)
+    except:
+        msg = 'seacyc function failed:'
+        logger.exception(msg)
         raise Exception(msg)
 
     return seasoncyc_base, seasoncyc_sim
@@ -225,8 +225,8 @@ def config_edits(configfile):
             file.write(filedata)
 
         logger.info('configfile modified')
-    except Exception as e:
-        logger.debug('Failed to modify configfile: %s ' % e)
+    except:
+        logger.exeption('Failed to modify configfile:')
 
     return configfile
 
@@ -290,17 +290,14 @@ def reformat_analogs(analogs):
             suffix='.tsv', prefix='modified-analogfile', dir=output_path, text=False)
         df_all.to_csv(analogs_mod, sep='\t')
         logger.info('successfully reformatted analog file')
-
-    except Exception as e:
-        msg = 'failed to reformat analog file %s ' % e
-        logger.debug(msg)
-
+    except:
+        logger.exception('failed to reformat analog file')
     return analogs_mod
 
 
 def get_viewer_configfile(analogs):
     """
-    finds or generates configuration file for an analogs file 
+    finds or generates configuration file for an analogs file
     to be used by the analogs viewer. The configuration file
     will be copied into the output folder.
 
@@ -404,7 +401,7 @@ def copy_configfile(configfile):
 
     :param configfile: configuration file (path/to/file.txt) in working dir
 
-    :return str,str: output_path, output_url 
+    :return str,str: output_path, output_url
     """
     from flyingpigeon import config
 
@@ -429,7 +426,7 @@ def get_viewer(analogs_mod, configfile):
     Generate an analogs viewer based on a template.
 
     :param analogs_mod: modified analogs file (output of reformat_analogs)
-    :param configfile: configuration file 
+    :param configfile: configuration file
 
     return html: analog viewer html page
     """
