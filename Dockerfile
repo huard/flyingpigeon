@@ -28,6 +28,7 @@ RUN bash bootstrap.sh -i && bash requirements.sh
 # Set conda enviroment
 ENV ANACONDA_HOME /opt/conda
 ENV CONDA_ENVS_DIR /opt/conda/envs
+ENV PATH ${CONDA_ENVS_DIR}/flyingpigeon/bin:${PATH}
 
 # Run install and fix permissions
 RUN make clean install && chmod 755 /opt/birdhouse/etc && chmod 755 /opt/birdhouse/var/run
