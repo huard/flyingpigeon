@@ -4,17 +4,25 @@ from pywps import config as wpsconfig
 import logging
 logger = logging.getLogger(__name__)
 
+
 def shapefiles_dir():
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'shapefiles')
 
+
 def Rsrc_dir():
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'Rsrc')
+
 
 def JSsrc_dir():
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'JSsrc')
 
 def masks_dir():
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'masks')
+
+
+def static_dir():
+    return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static')
+
 
 def cache_path():
     cache_path = None
@@ -25,6 +33,7 @@ def cache_path():
         cache_path = os.path.join(os.sep, "tmp", "cache")
     return cache_path
 
+
 def output_path(): 
     try:
         output_path  =  wpsconfig.getConfigValue("server", "outputPath")
@@ -32,6 +41,7 @@ def output_path():
         output_path = None
         logger.warn('no output path configured')
     return output_path
+
 
 def outputUrl_path():
     try: 
@@ -41,6 +51,7 @@ def outputUrl_path():
         logger.warn('no outputUrl configured')
     return outputUrl    
 
+
 def www_url(): 
     try:
         url = wpsconfig.getConfigValue("flyingpigeon", "www_url")
@@ -48,7 +59,8 @@ def www_url():
         url = None
         logger.warn('no www-url configured')
     return url
-
+     
+      
 def wfs_url():
     try:
         url = wpsconfig.getConfigValue("flyingpigeon", "wfs_url")

@@ -2,6 +2,7 @@ import os
 
 from pywps.Process import WPSProcess
 import logging
+from flyingpigeon.log import init_process_logger
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +50,21 @@ class AnalogsviewerProcess(WPSProcess):
             type=type(''),
         )
 
+        self.output_log = self.addComplexOutput(
+            identifier="output_log",
+            title="Logging information",
+            abstract="Collected logs during process run.",
+            formats=[{"mimeType": "text/plain"}],
+            asReference=True,
+        )
+
     def execute(self):
         ######################
         # start execution
         ######################
+
+        init_process_logger('log.txt')
+        self.output_log.setValue('log.txt')
 
         from flyingpigeon import analogs as anlg
         from flyingpigeon import config
@@ -80,7 +92,6 @@ class AnalogsviewerProcess(WPSProcess):
                 'Successfully generated analogs viewer html page', 90)
 
             outputUrl_path = config.outputUrl_path()
-
             output_data = outputUrl_path + '/' + basename(f)
             logger.info('Data url: %s ' % output_data)
             logger.info('output_av: %s ' % output_av)
