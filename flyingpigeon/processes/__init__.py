@@ -1,5 +1,6 @@
 __all__ = [
         "wps_subset_WFS",
+        "wps_subset_WFS_v0",
         "wps_subset_continents",
         "wps_subset_countries",
         "wps_subset_regionseurope",
