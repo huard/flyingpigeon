@@ -28,22 +28,23 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
          regrid_destination=None, regrid_options='bil', level_range=None,
          geom=None, output_format_options=False, search_radius_mult=2.,
          select_nearest=False, select_ugid=None, spatial_wrapping=None, t_calendar=None, time_region=None,
-         time_range=None, dir_output=None, output_format='nc'):
+         time_range=None, dir_output=None, output_format='nc', geomcabinet=DIR_SHP, spatial_operation='intersects', aggregate=False):
     '''
     ocgis operation call
 
-    :param resource:
+    :param resource: the input NetCDF files
     :param variable: variable in the input file to be picked
     :param dimension_map: dimension map in case of unconventional storage of data
     :param calc: ocgis calc syntax for calculation partion
     :param calc_grouping: time aggregate grouping
-    :param conform_units_to:
+    :param conform_units_to: TODO
     :param memory_limit: limit the amount of data to be loaded into the memory at once \
         if None (default) free memory is detected by birdhouse
     :param level_range: subset of given levels
     :param prefix: string for the file base name
     :param regrid_destination: file path with netCDF file with grid for output file
     :param geom: name of shapefile stored in birdhouse shape cabinet
+    :param geomcabinet: directory that holds the shapefiles
     :param output_format_options: output options for netCDF e.g compression level()
     :param regrid_destination: file containing the targed grid (griddes.txt or netCDF file)
     :param regrid_options: methods for regridding:
@@ -53,30 +54,49 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
                           'nn' = nearest neighbour
                           'con' = First-order conservative remapping
                           'laf' = largest area fraction reamapping
+    :param spatial_operation: methods for subsetting:
+                          'intersects' = selects boundaries if overlaps subset polygon
+                          'clip' = cut boundaries with subset polygon
+    :param aggregate: request a spatial aggregation. Output format must be 'numpy'
     :param search_radius_mult: search radius for point geometries. All included gridboxes will be returned
     :param select_nearest: nearest neighbour selection for point geometries
     :param select_ugid: ugid for appropriate polygons
     :param spatial_wrapping: how to handle coordinates in case of subsets, options: None (default), 'wrap', 'unwrap'
     :param time_region: select single month
-    :param time_range: sequence of two datetime.datetime objects to mark start and end point
-    :param dir_output (default= curdir):
-    :param output_format:
+    :param time_range: sequence of two datetime.datetime objects to mark start and end point 
+    :param dir_output (default= curdir): the directory that will hold the output
+    :param output_format: the format of computed output:
+                          'nc' = NetCDF output
+                          'numpy' = Numpy array
+
     :return: output file path
     '''
     logger.info('Start ocgis module call function')
-    from ocgis import OcgOperations, RequestDataset, env
+    from ocgis import OcgOperations, RequestDataset, env, constants
     from ocgis.util.large_array import compute
     import uuid
 
-    # prepare the environment
-    env.DIR_SHPCABINET = DIR_SHP
+    if geomcabinet is None:
+        geomcabinet = DIR_SHP
+
+    env.DIR_SHPCABINET = geomcabinet
+
+    if env.DIR_SHPCABINET == DIR_SHP:
+        env.DEFAULT_GEOM_UID = constants.OCGIS_UNIQUE_GEOMETRY_IDENTIFIER
+    else:
+        env.DEFAULT_GEOM_UID = 'FID'
+
     env.OVERWRITE = True
     # env.DIR_OUTPUT = dir_output
     # logger.debug(' **** env.DIR_OUTPUT  = %s ' % env.DIR_OUTPUT)
 
     if dir_output is None:
         dir_output = abspath(curdir)
-
+    
+    #TODO Tom: tes lignes 97-99 sont en conflit avec les lignes 100-113 (est-ce que ta modif est toujours requise?)
+    #Removing previous condition that sets spatial_reorder to True if geom not null
+    # spatial_reorder = False
+    # spatial_wrapping = None
     #
     # if geom is not None:
     #     spatial_reorder = True
@@ -119,12 +139,10 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
                             dimension_map=dimension_map, conform_units_to=conform_units_to,
                             time_region=time_region, t_calendar=t_calendar, time_range=time_range)
         ops = OcgOperations(dataset=rd,
-                            output_format_options=output_format_options,
                             dir_output=dir_output,
                             spatial_wrapping=spatial_wrapping,
                             spatial_reorder=spatial_reorder,
-                            # regrid_destination=rd_regrid,
-                            # options=options,
+                            spatial_operation=spatial_operation,
                             calc=calc,
                             calc_grouping=calc_grouping,
                             geom=geom,
@@ -133,7 +151,8 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
                             search_radius_mult=search_radius_mult,
                             select_nearest=select_nearest,
                             select_ugid=select_ugid,
-                            add_auxiliary_files=False)
+                            add_auxiliary_files=False,
+                            aggregate=aggregate)
         logger.info('OcgOperations set')
     except Exception as e:
         logger.debug('failed to setup OcgOperations: %s' % e)
@@ -162,7 +181,6 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
             variable = rd.variable
             logger.info('%s as variable dedected' % (variable))
 
-        # data_kb = size['total']/reduce(lambda x,y: x*y,size['variables'][variable]['value']['shape'])
         logger.info('data_mb  = %s ; memory_limit = %s ' % (data_mb, mem_limit))
     except Exception as e:
         logger.debug('failed to compare dataload with free memory %s ' % e)
@@ -192,12 +210,10 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
                 calc = '%s=%s*1' % (variable, variable)
                 logger.info('calc set to = %s ' % calc)
             ops = OcgOperations(dataset=rd,
-                                output_format_options=output_format_options,
                                 dir_output=dir_output,
                                 spatial_wrapping=spatial_wrapping,
                                 spatial_reorder=spatial_reorder,
-                                # regrid_destination=rd_regrid,
-                                # options=options,
+                                spatial_operation=spatial_operation,
                                 calc=calc,
                                 calc_grouping=calc_grouping,
                                 geom=geom,
@@ -206,7 +222,8 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
                                 search_radius_mult=search_radius_mult,
                                 select_nearest=select_nearest,
                                 select_ugid=select_ugid,
-                                add_auxiliary_files=False)
+                                add_auxiliary_files=False,
+                                aggregate=aggregate)
             geom_file = compute(ops, tile_dimension=int(tile_dim), verbose=True)
             print 'ocgis calculated'
         except Exception as e:
@@ -240,7 +257,17 @@ def call(resource=[], variable=None, dimension_map=None, calc=None,
         lat, lon = unrotate_pole(output)
     except:
         logger.exception('failed to unrotate pole') 
+
+    #resets UID
+    env.DEFAULT_GEOM_UID = constants.DEFAULT_GEOMETRY_KEY
+
     return output
+
+def set_custom_shapefile_info(shpcabinet, unique_id):
+    from ocgis import env
+
+    env.DIR_SHPCABINET = shpcabinet
+    env.DEFAULT_GEOM_UID = unique_id
 
 
 def eval_timerange(resource, time_range):

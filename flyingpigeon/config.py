@@ -16,7 +16,6 @@ def Rsrc_dir():
 def JSsrc_dir():
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'JSsrc')
 
-
 def masks_dir():
     return os.path.join(os.path.abspath(os.path.dirname(__file__)), 'masks')
 
@@ -35,9 +34,9 @@ def cache_path():
     return cache_path
 
 
-def output_path():
+def output_path(): 
     try:
-        output_path = wpsconfig.getConfigValue("server", "outputPath")
+        output_path  =  wpsconfig.getConfigValue("server", "outputPath")
     except:
         output_path = None
         logger.warn('no output path configured')
@@ -45,18 +44,29 @@ def output_path():
 
 
 def outputUrl_path():
-    try:
+    try: 
         outputUrl = wpsconfig.getConfigValue("server", "outputUrl")
     except:
         outputUrl = None
         logger.warn('no outputUrl configured')
-    return outputUrl
+    return outputUrl    
 
 
-def www_url():
+def www_url(): 
     try:
         url = wpsconfig.getConfigValue("flyingpigeon", "www_url")
     except:
         url = None
         logger.warn('no www-url configured')
     return url
+     
+      
+def wfs_url():
+    try:
+        url = wpsconfig.getConfigValue("flyingpigeon", "wfs_url")
+    except:
+        url = None
+        logger.warn('no wfs-url configured')
+    return url
+    
+
