@@ -6,7 +6,7 @@ from flyingpigeon.utils import drs_filename, get_variable, calc_grouping, sort_b
 from flyingpigeon import config
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("PYWPS")
 
 DIR_MASKS = config.masks_dir()
 DIR_SHP = config.shapefiles_dir()
@@ -33,89 +33,118 @@ def countries_longname():
 
 
 def masking(resource, sftlf, threshold=50, land_area=True, prefix=None):
-            """
-            Set land/sea areas to nan.
+    """
+    Set land/sea areas to nan.
 
-            :param resource: string path to netCDF resource
-            :param sftlf: land_area fraction netCDF file
-            :param threshold: Percentage of land area
-            :param land_area: If True (default), sea areas will set to nan
-            :param prefix:      prefix for filename. If prefix is not set, a filename will be created
+    :param resource: string path to netCDF resource
+    :param sftlf: land_area fraction netCDF file
+    :param threshold: Percentage of land area
+    :param land_area: If True (default), sea areas will set to nan
+    :param prefix:  prefix for filename. If prefix is not set, a filename will be created
 
-            :returns str: path to netCDF file
-            """
-            cdo = Cdo()
-            #######################
-            # TODO check sftlf unit
-            #######################
-            th = threshold/100
+    :returns str: path to netCDF file
+    """
+    cdo = Cdo()
+    #######################
+    # TODO check sftlf unit
+    #######################
+    th = threshold / 100.0
 
-            ###################
-            # generate the mask
-            if land_area is True:
-                        mask = cdo.gtc(th, input=sftlf, output='mask.nc')
+    ###################
+    # generate the mask
+    if land_area is True:
+        mask = cdo.gtc(th, input=sftlf, output='mask.nc')
+    else:
+        # TODO: check the operator ltc/stc
+        mask = cdo.ltc(th, input=sftlf, output='mask.nc')
+
+    # generate output filename
+    if prefix is not None:
+        nc_masked = prefix + '.nc'
+    else:
+        _, nc_masked = mkstemp(dir='.', suffix='.nc')
+
+    #################
+    # divide by mask
+
+    _ = cdo.div(input=[resource, mask], output=nc_masked)
+
+    return nc_masked
+
+
+def clipping(resource=[], variable=None, dimension_map=None, calc=None, output_format='nc',
+             calc_grouping=None, time_range=None, time_region=None,
+             historical_concatination=True, prefix=None,
+             spatial_wrapping='wrap', polygons=None, mosaic=False,
+             dir_output=None, memory_limit=None):
+    """ returns list of clipped netCDF files
+
+    :param resource: list of input netCDF files
+    :param variable: variable (string) to be used in netCDF
+    :param dimesion_map: specify a dimension map if input netCDF has unconventional dimension
+    :param calc: ocgis calculation argument
+    :param calc_grouping: ocgis calculation grouping
+    :param historical_concatination: concat files of RCPs with appropriate historical runs into one timeseries
+    :param prefix: prefix for output file name
+    :param polygons: list of polygons to be used. If more than 1 in the list, an appropriate mosaic will be clipped
+    :param mosaic: Whether the polygons are aggregated into a single geometry (True) or individual files are created for each geometry (False).
+    :param output_format: output_format (default='nc')
+    :param dir_output: specify an output location
+    :param time_range: [start, end] of time subset
+    :param time_region: year, months or days to be extracted in the timeseries
+
+    :returns list: path to clipped files
+    """
+
+    from flyingpigeon.utils import get_variable, drs_filename
+    from flyingpigeon.ocgis_module import call
+
+    if type(resource) != list:
+        resource = list([resource])
+    if type(polygons) != list:
+        polygons = list([polygons])
+    if prefix is not None:
+        if type(prefix) != list:
+            prefix = list([prefix])
+
+    geoms = set()
+    ncs = sort_by_filename(resource, historical_concatination=historical_concatination)  # historical_concatenation=True
+    geom_files = []
+    if mosaic is True:
+        try:
+            nameadd = '_'
+            for polygon in polygons:
+                geoms.add(get_geom(polygon))
+                nameadd = nameadd + polygon.replace(' ', '')
+            if len(geoms) > 1:
+                LOGGER.error('polygons belong to different shapefiles! mosaic option is not possible %s', geoms)
             else:
-                        mask = cdo.stc(th, input=sftlf, output='mask.nc')
-
-            # generate output filename
-            if prefix is not None:
-                        nc_masked = prefix + '.nc'
-            else:
-                        _, nc_masked = mkstemp(dir='.', suffix='.nc')
-
-            #################
-            # divide by mask
-
-            _ = cdo.div(input=[resource, mask], output=nc_masked)
-
-            return nc_masked
-
-
-def clipping(resource=[], variable=None, dimension_map=None, calc=None,      output_format='nc',
-                                           calc_grouping= None, time_range=None, time_region=None,
-                                           historical_concatination=True, prefix=None,
-                                           spatial_wrapping='wrap', polygons=None, mosaic=False,
-                                           dir_output=None, memory_limit=None, geomcabinet=None,
-                                           spatial_operation='intersects', geom=None, aggregate=False):
-      """ returns list of clipped netCDF files
-      
-      :param resource: list of input netCDF files
-      :param variable: variable (string) to be used in netCDF
-      :param dimension_map: specify a dimension map if input netCDF has unconventional dimension
-      :param calc: ocgis calculation argument
-      :param calc_grouping: ocgis calculation grouping 
-      :param spatial_operation: methods for subsetting:
-                                'intersects' = selects boundaries if overlaps subset polygon
-                                'clip' = cut boundaries with subset polygon
-      :param historical_concatination: concat files of RCPs with appropriate historical runs into one timeseries 
-      :param prefix: prefix for output file name
-      :param polygons: list of polygons to be used. If more than 1 in the list, an appropriate mosaic will be clipped
-      :param output_format: output_format (default='nc')
-      :param dir_output: specify an output location
-      :param aggregate: request a spatial aggregation. Output format must be 'numpy'
-      :param geomcabinet: directory that holds the shapefiles
-      :param geom: name of shapefile stored in birdhouse shape cabinet
-      :param time_range: [start, end] of time subset
-      :param time_region: year, months or days to be extracted in the timeseries
-
-      :returns list: path to clipped files 
-      """
-      
-      from flyingpigeon.utils import get_variable, drs_filename
-      from flyingpigeon.ocgis_module import call
-      
-      if type(resource) != list: 
-            resource = list([resource])
-      if type(polygons) != list:
-            polygons = list([polygons])
-      if prefix is not None:
-            if type(prefix) != list:
-                  prefix = list([prefix])
-      
-      geoms = set()
-      ncs = sort_by_filename(resource, historical_concatination=historical_concatination) #      historical_concatenation=True
-      geom_files = []
-      if mosaic is True :
+                geom = geoms.pop()
+            ugids = get_ugid(polygons=polygons, geom=geom)
+        except Exception as e:
+            LOGGER.debug('geom identification failed %s ' % e)
+        for i, key in enumerate(ncs.keys()):
+            try:
+                # if variable is None:
+                variable = get_variable(ncs[key])
+                LOGGER.info('variable %s detected in resource' % (variable))
+                if prefix is None:
+                    name = key + nameadd
+                else:
+                    name = prefix[i]
+                geom_file = call(resource=ncs[key], variable=variable, calc=calc, calc_grouping=calc_grouping,
+                                 output_format=output_format, prefix=name,
+                                 geom=geom, select_ugid=ugids, time_range=time_range,
+                                 time_region=time_region,
+                                 spatial_wrapping=spatial_wrapping, memory_limit=memory_limit,
+                                 dir_output=dir_output, dimension_map=dimension_map)
+                geom_files.append(geom_file)
+                LOGGER.info('ocgis mosaik clipping done for %s ' % (key))
+            except:
+                msg = 'ocgis mosaik clipping failed for %s ' % (key)
+                LOGGER.exception(msg)
+    else:
+        for i, polygon in enumerate(polygons):
             try:
                   nameadd = '_'
                   for polygon in polygons: 
@@ -132,57 +161,25 @@ def clipping(resource=[], variable=None, dimension_map=None, calc=None,      out
                   try:
                         # if variable is None:
                         variable = get_variable(ncs[key])
-                        logger.info('variable %s detected in resource' % (variable))
+                        LOGGER.info('variable %s detected in resource' % (variable))
                         if prefix is None:
                               name = key + nameadd
                         else:
-                              name = prefix[i]
-                        geom_file = call(resource=ncs[key], variable=variable, calc=calc, calc_grouping=calc_grouping, 
-                                                                         output_format=output_format,                                                                              prefix=name,
-                                                                         geom=geom, select_ugid=ugids, time_range=time_range,
-                                                                         time_region=time_region, 
-                                                                         spatial_wrapping=spatial_wrapping, memory_limit=memory_limit,
-                                                                         dir_output=dir_output, dimension_map=dimension_map,
-                                                                         geomcabinet=geomcabinet,
-                                                                         spatial_operation=spatial_operation, aggregate=aggregate)
-                        geom_files.append( geom_file ) 
-                        logger.info('ocgis mosaik clipping done for %s ' % (key)) 
-                  except:
-                        msg = 'ocgis mosaik clipping failed for %s ' % (key)
-                        logger.exception(msg)
-      else: 
-            for i, polygon in enumerate(polygons): 
-                  try:
-                        if geom is None:
-                              geom = get_geom(polygon)
-                              ugid = get_ugid(polygons=polygon, geom=geom)
-                        else:
-                              ugid = polygon
-
-                        for key in      ncs.keys():
-                              try:
-                                    # if variable is None:
-                                    variable = get_variable(ncs[key])
-                                    logger.info('variable %s detected in resource' % (variable))      
-                                    if prefix is None: 
-                                          name = key + '_' + polygon.replace(' ', '')
-                                    else:
-                                          name = prefix[i]
-                                    geom_file = call(resource=ncs[key], variable=variable,      calc=calc, calc_grouping=calc_grouping,
-                                                                                     output_format=output_format,
-                                                                                     prefix=name, geom=geom, select_ugid=ugid, dir_output=dir_output, 
-                                                                                     dimension_map=dimension_map, spatial_wrapping=spatial_wrapping, 
-                                                                                     memory_limit=memory_limit,time_range=time_range, time_region=time_region,
-                                                                                     geomcabinet=geomcabinet,
-                                                                                     spatial_operation=spatial_operation, aggregate=aggregate)
-                                    geom_files.append( geom_file )
-                                    logger.info('ocgis clipping done for %s ' % (key))
-                              except:
-                                    msg = 'ocgis clipping failed for %s ' % (key)
-                                    logger.exception(msg)
-                  except:
-                              logger.exception('geom identification failed')
-      return      geom_files
+                            name = prefix[i]
+                        geom_file = call(resource=ncs[key], variable=variable, calc=calc, calc_grouping=calc_grouping,
+                                         output_format=output_format,
+                                         prefix=name, geom=geom, select_ugid=ugid, dir_output=dir_output,
+                                         dimension_map=dimension_map, spatial_wrapping=spatial_wrapping,
+                                         memory_limit=memory_limit, time_range=time_range, time_region=time_region,
+                                         )
+                        geom_files.append(geom_file)
+                        LOGGER.info('ocgis clipping done for %s ' % (key))
+                    except:
+                        msg = 'ocgis clipping failed for %s ' % (key)
+                        LOGGER.exception(msg)
+            except:
+                LOGGER.exception('geom identification failed')
+    return geom_files
 
 
 def get_dimension_map(resource):
@@ -269,62 +266,56 @@ def get_ugid(polygons=None, geom=None):
             from ocgis import env, ShpCabinetIterator
             # from ocgis import env
 
-            if polygons is None:
-                        result = None
-            else:
-                        if type(polygons) != list:
-                                    polygons = list([polygons])
+        env.DIR_SHPCABINET = DIR_SHP
+        sc_iter = ShpCabinetIterator(geom)
+        result = []
 
-                        env.DIR_SHPCABINET = DIR_SHP
-                        sc_iter = ShpCabinetIterator(geom)
-                        result = []
+        if geom == 'countries':
+            for row in sc_iter:
+                for polygon in polygons:
+                    if row['properties']['ADM0_A3'] == polygon:
+                        result.append(row['properties']['UGID'])
 
-                        if geom == 'countries':
-                                    for row in sc_iter:
-                                                for polygon in polygons:
-                                                            if row['properties']['ADM0_A3'] == polygon:
-                                                                        result.append(row['properties']['UGID'])
+        elif geom == 'extremoscope':
+            for row in sc_iter:
+                for polygon in polygons:
+                    if row['properties']['HASC_1'] == polygon:
+                        result.append(row['properties']['UGID'])
 
-                        elif geom == 'extremoscope':
-                                    for row in sc_iter:
-                                                for polygon in polygons:
-                                                            if row['properties']['HASC_1'] == polygon:
-                                                                        result.append(row['properties']['UGID'])
-
-                        elif geom == 'continents':
-                                    for row in sc_iter:
-                                                for polygon in polygons:
-                                                            if row['properties']['CONTINENT'] == polygon:
-                                                                        result.append(row['properties']['UGID'])
-                        else:
-                                    from ocgis import ShpCabinet
-                                    sc = ShpCabinet(DIR_SHP)
-                                    logger.debug('geom: %s not found in shape cabinet. Available geoms are: %s ', geom, sc)
-            return result
+        elif geom == 'continents':
+            for row in sc_iter:
+                for polygon in polygons:
+                    if row['properties']['CONTINENT'] == polygon:
+                        result.append(row['properties']['UGID'])
+        else:
+            from ocgis import ShpCabinet
+            sc = ShpCabinet(DIR_SHP)
+            LOGGER.debug('geom: %s not found in shape cabinet. Available geoms are: %s ', geom, sc)
+    return result
 
 
 def get_geom(polygon=None):
-            """ returns the approriate shapefile (geom) for a given polygon abbreviation
+    """ returns the approriate shapefile (geom) for a given polygon abbreviation
 
-            :param polygon: polygon short name
+    :param polygon: polygon short name
 
-            returns str: name of shapefile (geom)
-            """
+    returns str: name of shapefile (geom)
+    """
 
-            if polygon is None:
-                        geom = None
-            else:
-                        if polygon in _COUNTRIES_:      # (polygon) == 3:
-                                    geom = 'countries'
-                        elif polygon in _POLYGONS_EXTREMOSCOPE_:      # len(polygon) == 5 and polygon[2] == '.':
-                                    geom = 'extremoscope'
-                        elif polygon in _EUREGIONS_:
-                                    geom = 'extremoscope'
-                        elif polygon in _CONTINENTS_:
-                                    geom = 'continents'
-                        else:
-                                    logger.debug('polygon: %s not found in geoms' % polygon)
-            return geom
+    if polygon is None:
+        geom = None
+    else:
+        if polygon in _COUNTRIES_:  # (polygon) == 3:
+            geom = 'countries'
+        elif polygon in _POLYGONS_EXTREMOSCOPE_:  # len(polygon) == 5 and polygon[2] == '.':
+            geom = 'extremoscope'
+        elif polygon in _EUREGIONS_:
+            geom = 'extremoscope'
+        elif polygon in _CONTINENTS_:
+            geom = 'continents'
+        else:
+            LOGGER.debug('polygon: %s not found in geoms' % polygon)
+    return geom
 
 # === Available Polygons
 _CONTINENTS_ = get_shp_column_values(geom='continents', columnname='CONTINENT')

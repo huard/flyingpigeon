@@ -1,8 +1,24 @@
 import os
-from pywps import config as wpsconfig
+from pywps import configuration
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("PYWPS")
+
+
+def esgfsearch_url():
+    url = configuration.get_config_value("extra", "esgfsearch_url")
+    if not url:
+        LOGGER.warn("No ESGF Search URL configured. Using default value.")
+        url = 'https://esgf-data.dkrz.de/esg-search'
+    return url
+
+
+def esgfsearch_distrib():
+    distrib = configuration.get_config_value("extra", "esgfsearch_distrib")
+    if distrib is None:
+        LOGGER.warn("No ESGF Search distrib option configured. Using default value.")
+        distrib = True
+    return distrib
 
 
 def shapefiles_dir():
@@ -25,39 +41,34 @@ def static_dir():
 
 
 def cache_path():
-    cache_path = None
-    try:
-        cache_path = wpsconfig.getConfigValue("cache", "cache_path")
-    except:
-        logger.warn("No cache path configured. Using default value.")
+    cache_path = configuration.get_config_value("cache", "cache_path")
+    if not cache_path:
+        LOGGER.warn("No cache path configured. Using default value.")
         cache_path = os.path.join(os.sep, "tmp", "cache")
     return cache_path
 
 
-def output_path(): 
-    try:
-        output_path  =  wpsconfig.getConfigValue("server", "outputPath")
-    except:
+def output_path():
+    output_path = configuration.get_config_value("server", "outputpath")
+    if not output_path:
         output_path = None
-        logger.warn('no output path configured')
+        LOGGER.warn('no output path configured')
     return output_path
 
 
-def outputUrl_path():
-    try: 
-        outputUrl = wpsconfig.getConfigValue("server", "outputUrl")
-    except:
-        outputUrl = None
-        logger.warn('no outputUrl configured')
-    return outputUrl    
-
-
-def www_url(): 
-    try:
-        url = wpsconfig.getConfigValue("flyingpigeon", "www_url")
-    except:
+def output_url():
+    url = configuration.get_config_value("server", "outputurl")
+    if not url:
         url = None
-        logger.warn('no www-url configured')
+        LOGGER.warn('no outputurl configured')
+    return url
+
+
+def www_url():
+    url = configuration.get_config_value("extra", "www_url")
+    if not url:
+        url = None
+        LOGGER.warn('no www-url configured')
     return url
      
       

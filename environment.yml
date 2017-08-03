@@ -7,7 +7,7 @@ channels:
 - nesii
 # the r hell ...
 - r
-- bioconda
+- bioconda  # for r-mclust
 dependencies:
 - python=2.7
 - ipython
@@ -24,22 +24,27 @@ dependencies:
 ################
 # tests
 - pytest
+- nose
+# pep8
 - flake8
+- pycodestyle
 ################
 # docs
 - sphinx
 - sphinx_rtd_theme
+- doc8
 ################
 # wps
 - nginx
 - supervisor=3.3.1
 - gunicorn
 - gevent
-- pywps=3.2.6=py27_1 
+- pywps=4.0.0
 - mako
+- genshi
 ################
 # misc
-- pywget
+#- pywget
 - pyyaml=3.12
 ################
 # numeric
@@ -47,27 +52,31 @@ dependencies:
 - scipy 
 - pandas #=0.18.1
 - statsmodels #=0.6.1
-- scikit-learn #=0.17.1 
+- scikit-learn #=0.17.1
+################
 # visualisation
-- matplotlib
-- cartopy #=0.14.2 # conflicts with numpy >1.10
-- iris #=1.9.2 # conflicts with numpy >1.10
+- matplotlib=2.0.0=np112py27_2
+- functools32=3.2.3.2=py27_0 # badly pinned matplotlib dependency
+- cartopy
+- iris
 - reportlab
 ################
 ## cdo ocgis 
 - cdo #=1.7.1=2
 - python-cdo
-- ocgis-next=1.4.0.dev1=py27_7  #  nesii/channel/ocgis-next
-- proj.4=4.9.2
+# - ocgis=2.0.0
+- ocgis-next=2.0.1.dev1=py27_1   # =1.4.0.dev1=py27_7  #  nesii/channel/ocgis-next
+- icclim
+- proj4=4.9.3
 - geos=3.5.1
 - jpeg=9b
 - gdal=2.1.3
-################
-# analogue
-- castf90=0.1.5
-################
-# r
-- cairo # for X11 independend plot support 
+# ################
+# # analogue
+# - castf90=0.1.6
+# ################
+# # r
+- cairo # for X11 independend plot support
 - r=3.2  # 3.3 conflicts with icu=56
 - rpy2 #=2.7.0
 - r-mclust #=5.1 subsuituted by cluster
@@ -75,9 +84,11 @@ dependencies:
 - r-fields #=8.4 conflicts with r3.3.1 needs 3.2
 - r-gridextra #=2.0.0
 - harfbuzz
-#- r-cairo#=1.5_9 build in r-base
+# #- r-cairo#=1.5_9 build in r-base
+################
+# esgf
+- esgf-pyclient
 - pip:
-  - genshi==0.7
   - pygbif==0.2.0 #0.1.4
   - sphinx-autoapi==0.4.0
 #  - cdo==1.3.0

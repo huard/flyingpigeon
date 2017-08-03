@@ -1,114 +1,125 @@
 """
 Processes for Species distribution
-Author: Nils Hempelmann (nils.hempelmann@lsce.ipsl.fr)
+Author: Nils Hempelmann , Wolfgang Falk
 """
 
-from pywps.Process import WPSProcess
+from pywps import Process
+from pywps import LiteralInput
+from pywps import ComplexInput, ComplexOutput
+from pywps import Format, FORMATS
+from pywps.app.Common import Metadata
+
 from flyingpigeon.sdm import _SDMINDICES_
+from flyingpigeon import sdm
+from flyingpigeon.utils import archive, archiveextract, sort_by_filename
 from flyingpigeon.log import init_process_logger
+from flyingpigeon.utils import rename_complexinputs
+
+from os.path import basename
 
 import logging
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger("PYWPS")
 
 
-class SDMgetindicesProcess(WPSProcess):
-
+class SDMgetindicesProcess(Process):
     def __init__(self):
-        WPSProcess.__init__(
-            self,
+        inputs = [
+            ComplexInput('resource', 'Resource',
+                         abstract='NetCDF Files or archive (tar/zip) containing netCDF files.',
+                         metadata=[Metadata('Info')],
+                         min_occurs=1,
+                         max_occurs=1000,
+                         supported_formats=[
+                             Format('application/x-netcdf'),
+                             Format('application/x-tar'),
+                             Format('application/zip'),
+                         ]),
+
+            LiteralInput("indices", "Indices",
+                         abstract="Climate indices related to growth conditions \
+                                    of tree species",
+                         default='TG_JJA',
+                         data_type='string',
+                         min_occurs=1,
+                         max_occurs=10,
+                         allowed_values=_SDMINDICES_
+                         ),
+
+            LiteralInput("archive_format", "Archive format",
+                         abstract="Result files will be compressed into archives. \
+                                   Choose an appropriate format",
+                         default="tar",
+                         data_type='string',
+                         min_occurs=1,
+                         max_occurs=1,
+                         allowed_values=['zip', 'tar']
+                         )
+        ]
+
+        outputs = [
+            ComplexOutput("output_indices", "Climate indices for growth conditions over all timesteps",
+                          abstract="Archive (tar/zip) containing calculated climate indices",
+                          supported_formats=[Format('application/x-tar'),
+                                             Format('application/zip')
+                                             ],
+                          as_reference=True,
+                          ),
+
+            ComplexOutput('ncout', 'Subsets for one resource',
+                          abstract="NetCDF file with subsets of one resource.",
+                          as_reference=True,
+                          supported_formats=[Format('application/x-netcdf')]
+                          ),
+
+
+            ComplexOutput('output_log', 'Logging information',
+                          abstract="Collected logs during process run.",
+                          as_reference=True,
+                          supported_formats=[Format('text/plain')]
+                          )
+        ]
+
+        super(SDMgetindicesProcess, self).__init__(
+            self._handler,
             identifier="sdm_getindices",
-            title="SDM -- calculation only indices",
-            version="0.9",
+            title="Species distribution Model (only indices calculation )",
+            version="0.10",
             metadata=[
-                {"title": "LWF", "href": "http://www.lwf.bayern.de/"},
-                {"title": "Doc",
-                    "href": "http://flyingpigeon.readthedocs.io/en/latest/descriptions/index.html#species-distribution-model"},  # noqa
-                {"title": "Paper",
-                    "href": "http://www.hindawi.com/journals/jcli/2013/787250/"},
-                {"title": "Tutorial",
-                    "href": "http://flyingpigeon.readthedocs.io/en/latest/tutorials/sdm.html"},
+                Metadata("LWF", "http://www.lwf.bayern.de/"),
+                Metadata(
+                    "Doc",
+                    "http://flyingpigeon.readthedocs.io/en/latest/descriptions/index.html#species-distribution-model"),
+                Metadata("paper",
+                         "http://www.hindawi.com/journals/jcli/2013/787250/"),
+                Metadata("Tutorial",
+                         "http://flyingpigeon.readthedocs.io/en/latest/tutorials/sdm.html"),
             ],
             abstract="Indices preparation for SDM process",
-            statusSupported=True,
-            storeSupported=True
+            inputs=inputs,
+            outputs=outputs,
+            status_supported=True,
+            store_supported=True,
         )
 
-        # Literal Input Data
-        # ------------------
-        self.resources = self.addComplexInput(
-            identifier="resources",
-            title="NetCDF File",
-            abstract="NetCDF File",
-            minOccurs=1,
-            maxOccurs=500,
-            maxmegabites=50000,
-            formats=[{"mimeType": "application/x-netcdf"}],
-        )
-
-        self.input_indices = self.addLiteralInput(
-            identifier="input_indices",
-            title="Indices",
-            abstract="Climate indices related to growth conditions \
-                of tree species",
-            default=['TG_JJA', 'TNn_Jan'],
-            type=type(''),
-            minOccurs=1,
-            maxOccurs=10,
-            allowedValues=_SDMINDICES_
-        )
-
-        self.archive_format = self.addLiteralInput(
-            identifier="archive_format",
-            title="Archive format",
-            abstract="Result files will be compressed into archives. \
-                Choose an appropriate format",
-            default="tar",
-            type=type(''),
-            minOccurs=1,
-            maxOccurs=1,
-            allowedValues=['zip', 'tar']
-        )
-
-        ###########
-        # OUTPUTS
-        ###########
-
-        self.output_indices = self.addComplexOutput(
-            identifier="output_indices",
-            title="Climate indices for growth conditions over all timesteps",
-            abstract="Archive (tar/zip) containing calculated climate indices",
-            formats=[{"mimeType": "application/x-tar"},
-                     {"mimeType": "application/zip"}],
-            asReference=True,
-        )
-
-        self.output_log = self.addComplexOutput(
-            identifier="output_log",
-            title="Logging information",
-            abstract="Collected logs during process run.",
-            formats=[{"mimeType": "text/plain"}],
-            asReference=True,
-        )
-
-    def execute(self):
-        from os.path import basename
-        from flyingpigeon import sdm
-        from flyingpigeon.utils import archive
+    def _handler(self, request, response):
 
         init_process_logger('log.txt')
-        self.output_log.setValue('log.txt')
+        response.outputs['output_log'].file = 'log.txt'
 
-        self.status.set('Start process', 0)
+        response.update_status('Start process', 0)
 
         try:
-            logger.info('reading the arguments')
-            resources = self.getInputValues(identifier='resources')
-            indices = self.getInputValues(identifier='input_indices')
-            logger.debug("indices = %s", indices)
-            archive_format = self.archive_format.getValue()
-        except Exception as e:
-            logger.error('failed to read in the arguments %s ' % e)
-        logger.info('indices %s ' % indices)
+            LOGGER.info('reading the arguments')
+            resources = archiveextract(
+                resource=rename_complexinputs(request.inputs['resource']))
+            indices = [inpt.data for inpt in request.inputs['indices']]
+            LOGGER.debug("indices = %s", indices)
+            archive_format = request.inputs['archive_format'][0].data
+        except:
+            msg = 'failed to read the arguments.'
+            LOGGER.exception(msg)
+            raise Exception(msg)
+        LOGGER.info('indices %s ' % indices)
 
         #################################
         # calculate the climate indices
@@ -116,24 +127,32 @@ class SDMgetindicesProcess(WPSProcess):
 
         # indices calculation
         ncs_indices = None
-        try:
-            self.status.set('start calculation of climate indices for %s'
-                            % indices, 30)
-            ncs_indices = sdm.get_indices(resources=resources, indices=indices)
-            logger.info('indice calculation done')
-        except:
-            msg = 'failed to calculate indices'
-            logger.exception(msg)
-            raise Exception(msg)
+        datasets = sort_by_filename(resources, historical_concatination=True)
+        LOGGER.debug("datasets=%s", datasets.keys())
+
+        for ds_name in datasets:
+            try:
+                response.update_status('calculation of {}'.format(ds_name), 30)
+                # TODO: what is happening with the results for each ds?
+                ncs_indices = sdm.get_indices(resource=datasets[ds_name], indices=indices)
+            except:
+                msg = 'indice calculation failed for {}'.format(ds_name)
+                LOGGER.exception(msg)
+                raise Exception(msg)
 
         # archive multiple output files to one archive file
         try:
             archive_indices = archive(ncs_indices, format=archive_format)
-            logger.info('indices 3D added to tarfile')
+            LOGGER.info('indices 3D added to tarfile')
         except:
             msg = 'failed adding indices to tar'
-            logger.exception(msg)
+            LOGGER.exception(msg)
             raise Exception(msg)
 
-        self.output_indices.setValue(archive_indices)
-        self.status.set('done', 100)
+        response.outputs['output_indices'].file = archive_indices
+
+        i = next((i for i, x in enumerate(ncs_indices) if x), None)
+        response.outputs['ncout'].file = ncs_indices[i]
+
+        response.update_status('done', 100)
+        return response

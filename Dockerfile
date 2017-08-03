@@ -2,7 +2,7 @@
 FROM birdhouse/bird-base:latest
 MAINTAINER https://github.com/bird-house
 
-LABEL Description="flyingpigeon application" Vendor="Birdhouse" Version="0.2.1"
+LABEL Description="flyingpigeon application" Vendor="Birdhouse" Version="0.11"
 
 # Configure hostname and ports for services
 ENV HTTP_PORT 8080
@@ -36,6 +36,8 @@ RUN make clean install && chmod 755 /opt/birdhouse/etc && chmod 755 /opt/birdhou
 # Volume for data, cache, logfiles, ...
 VOLUME /opt/birdhouse/var/lib
 VOLUME /opt/birdhouse/var/log
+# Volume for configs
+VOLUME /opt/birdhouse/etc
 
 # Ports used in birdhouse
 EXPOSE 9001 $HTTP_PORT $HTTPS_PORT $OUTPUT_PORT
