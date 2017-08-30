@@ -29,17 +29,21 @@ needs_sphinx = '1.3'
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'autoapi.extension',
+    #'autoapi.extension',
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.viewcode',
+    'sphinx.ext.autodoc',
+    'sphinx.ext.napoleon',
+    'sphinx_autodoc_pywps',
 ]
-
+napoleon_numpy_docstring = True
+"""
 autoapi_type = 'python'
 autoapi_dirs = ['../../flyingpigeon']
 autoapi_file_pattern = '*.py'
 autoapi_options = ['members', 'undoc-members', 'private-members']
-
+"""
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -331,7 +335,7 @@ rst_epilog = """
 .. _reStructuredText: http://sphinx-doc.org/rest.html
 .. _Read the Docs: https://readthedocs.org
 .. _Anaconda: https://www.continuum.io/
-.. _Buildout: http://www.buildout.org/en/latest/ 
+.. _Buildout: http://www.buildout.org/en/latest/
 .. _Birdhouse: http://birdhouse.readthedocs.io/en/latest/
 .. _Phoenix: http://pyramid-phoenix.readthedocs.io/en/latest/
 .. _Malleefowl: http://malleefowl.readthedocs.io/en/latest/
